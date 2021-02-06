@@ -7,7 +7,7 @@ from tinydb import TinyDB, where
 # manage scans with Redis queue, we have the length of the q, enqueues and dequeues ops.
 # Scan class manage the scan tasks instances (also create the uid - scan_id)
 # Redis comments - https://redis.io/commands
-from tinydb.table import Document
+
 
 db = TinyDB('./data/scans_db.json')
 
