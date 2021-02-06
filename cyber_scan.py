@@ -2,8 +2,14 @@ import os
 import urllib.request
 import urllib.error
 from urllib.parse import urlparse
+from tinydb import TinyDB, where
+from cachetools import cached, TTLCache
+
+db = TinyDB('./data/scans_db.json')
 
 
+# scan urls cache for 2min
+# @cached(cache=TTLCache(maxsize=2, ttl=120))
 def check_url_status(url_string):
 
     try:
@@ -27,4 +33,5 @@ def check_url_status(url_string):
 
 if __name__ == "__main__":
     check_url_status()
+
 

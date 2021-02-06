@@ -1,17 +1,21 @@
-import sys
+from tinydb import TinyDB, where
 
-import redis
-
-from ingest import IngestQueue
-
-s = input("enter scan_id> ")
+db = TinyDB('./data/scans_db.json')
+user_input = input("enter scan_id> ")
 
 
 def main():
-    r = redis.Redis()
-    queue = IngestQueue(r, "cyber_scan")
-    item = queue.by_id(s)
-    print(f"[{item.id}][{item.ttl}] Status is : {item.status}")
+    if user_input:
+        result = db.search(where('id') == user_input)
+        if result:
+            print(f"********** [{user_input}] **********\n")
+            print(f"[{user_input}] STATUS : {result[0]['status']} ")
+            print(f"[{user_input}] TTL : {result[0]['ttl']}\n")
+            print(f"********************************\n")
+        else:
+            print(f"[{user_input}] Not-Found")
+    else:
+        print(f"[ERROR] Input not valid")
 
 
 if __name__ == "__main__":

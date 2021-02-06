@@ -1,11 +1,15 @@
 import json
 import pickle
+import uuid
+from datetime import datetime
+from tinydb import TinyDB, where
 
-
-# manage Redis queue, we have the length of the q, enqueues and dequeues ops.
+# manage scans with Redis queue, we have the length of the q, enqueues and dequeues ops.
 # Scan class manage the scan tasks instances (also create the uid - scan_id)
 # Redis comments - https://redis.io/commands
-from cache_store.load_cache import CacheInit
+from tinydb.table import Document
+
+db = TinyDB('./data/scans_db.json')
 
 
 class IngestQueue(object):
@@ -26,30 +30,28 @@ class IngestQueue(object):
                 res.append(task)
         return res[0]
 
-    def enqueue(self, func, *args):
-        scan_task = Scan(func, *args, status="ACCEPTED")
-        cache_k = CacheInit.cache.set_cache(scan_task.id, scan_task)
-        print(cache_k)
+    def enqueue(self, scan_task):
+        db.update({"status": "RUNNING"}, where('id') == scan_task.id)
+        # serialized pickle way without saving file just for radis enq-deq
         serialized_task = pickle.dumps(scan_task, protocol=pickle.HIGHEST_PROTOCOL)
         self.conn.lpush(self.name, serialized_task)
-        return scan_task
+        return scan_task.id
 
     def dequeue(self):
+        # pop from queue & serialized
         _, serialized_task = self.conn.brpop(self.name)
         task = pickle.loads(serialized_task)
-        task.update_status("RUNNING")
-        task.process_scan()
+        updated_status_from_task = task.process_scan()
+        now = datetime.now()
+        ttl = now.strftime("%H:%M:%S")
+        db.update({"status": updated_status_from_task, "ttl": ttl}, where('id') == task.id)
         return task
 
 
 class Scan(object):
-    scanID = 0
-    easyGenID = (x for x in range(1, 100))
 
     def __init__(self, func, *args, status=None, ttl=None):
-        # self.id = uuid.uuid4().hex
-        Scan.scanID += 1
-        self.id = Scan.easyGenID.__next__()
+        self.id = str(uuid.uuid4())[:8]
         self.func = func
         self.args = args
         self.status = status
@@ -64,7 +66,8 @@ class Scan(object):
         return self
 
     def process_scan(self):
-        self.func(*self.args)
+        res = self.func(*self.args)
+        return res
 
     def _to_json(self):
-        return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+        return json.loads(json.dumps(self, default=lambda o: o.__dict__))
